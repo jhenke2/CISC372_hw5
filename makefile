@@ -1,5 +1,5 @@
 
-
+all:image openmp pthread
 image:image.c image.h
 	gcc -g image.c -o image -lm
 openmp:openmp.c image.h
