@@ -23,7 +23,7 @@ Matrix algorithms[]={
 };
 Image srcImage,destImage;
 enum KernelTypes type;
-int thread_count = 4;
+int thread_count = 10;
 //getPixelValue - Computes the value of a specific pixel on a specific channel using the selected convolution kernel
 //Paramters: srcImage:  An Image struct populated with the image being convoluted
 //           x: The x coordinate of the pixel
