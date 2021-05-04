@@ -3,7 +3,7 @@
 #include <time.h>
 #include <string.h>
 #include "image.h"
-#include <pthreads.h>
+#include <pthread.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -21,8 +21,9 @@ Matrix algorithms[]={
     {{-2,-1,0},{-1,1,1},{0,1,2}},
     {{0,0,0},{0,1,0},{0,0,0}}
 };
-
-
+Image srcImage,destImage;
+enum KernelTypes type;
+int thread_count = 4;
 //getPixelValue - Computes the value of a specific pixel on a specific channel using the selected convolution kernel
 //Paramters: srcImage:  An Image struct populated with the image being convoluted
 //           x: The x coordinate of the pixel
@@ -57,13 +58,22 @@ uint8_t getPixelValue(Image* srcImage,int x,int y,int bit,Matrix algorithm){
 //            destImage: A pointer to a  pre-allocated (including space for the pixel array) structure to receive the convoluted image.  It should be the same size as srcImage
 //            algorithm: The kernel matrix to use for the convolution
 //Returns: Nothing
-void convolute(Image* srcImage,Image* destImage,Matrix algorithm){
+//convolute(&srcImage,&destImage,algorithms[type]);
+
+void* pthread_convolute(void *rank){
     int row,pix,bit,span;
-    span=srcImage->bpp*srcImage->bpp;
-    for (row=0;row<srcImage->height;row++){
-        for (pix=0;pix<srcImage->width;pix++){
-            for (bit=0;bit<srcImage->bpp;bit++){
-                destImage->data[Index(pix,row,srcImage->width,bit,srcImage->bpp)]=getPixelValue(srcImage,pix,row,bit,algorithm);
+    long my_rank = (long)rank;
+    row = my_rank * srcImage.height / thread_count;
+    int row_end;
+    if (my_rank == thread_count - 1)
+	    row_end = srcImage.height;
+    else
+	    row_end = row + srcImage.height / thread_count;
+    span=srcImage.bpp*srcImage.bpp;
+    for (;row<row_end;row++){
+        for (pix=0;pix<srcImage.width;pix++){
+            for (bit=0;bit<srcImage.bpp;bit++){
+                destImage.data[Index(pix,row,srcImage.width,bit,srcImage.bpp)]=getPixelValue(&srcImage,pix,row,bit,algorithms[type]);
             }
         }
     }
@@ -100,9 +110,9 @@ int main(int argc,char** argv){
     if (!strcmp(argv[1],"pic4.jpg")&&!strcmp(argv[2],"gauss")){
         printf("You have applied a gaussian filter to Gauss which has caused a tear in the time-space continum.\n");
     }
-    enum KernelTypes type=GetKernelType(argv[2]);
-
-    Image srcImage,destImage,bwImage;   
+    type=GetKernelType(argv[2]);
+    
+    Image bwImage;   
     srcImage.data=stbi_load(fileName,&srcImage.width,&srcImage.height,&srcImage.bpp,0);
     if (!srcImage.data){
         printf("Error loading file %s.\n",fileName);
@@ -112,7 +122,15 @@ int main(int argc,char** argv){
     destImage.height=srcImage.height;
     destImage.width=srcImage.width;
     destImage.data=malloc(sizeof(uint8_t)*destImage.width*destImage.bpp*destImage.height);
-    convolute(&srcImage,&destImage,algorithms[type]);
+    
+    pthread_t* thread_handles = (pthread_t*)malloc(thread_count*sizeof(pthread_t));
+    for(long thread = 0; thread<thread_count;thread++)
+	    pthread_create(&thread_handles[thread],NULL,&pthread_convolute,(void*)thread);
+    for(int thread = 0; thread<thread_count;thread++)
+            pthread_join(thread_handles[thread],NULL);
+    
+    
+    
     stbi_write_png("output.png",destImage.width,destImage.height,destImage.bpp,destImage.data,destImage.bpp*destImage.width);
     stbi_image_free(srcImage.data);
     
