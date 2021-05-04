@@ -7,4 +7,4 @@ openmp:openmp.c image.h
 pthread:pthread.c image.h
 	gcc -g pthread.c -o pthread -lm -pthread
 clean:
-	rm -f image openmp pthread output.png
+	rm -f image openmp pthread output*.png
